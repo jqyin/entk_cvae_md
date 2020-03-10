@@ -54,6 +54,7 @@ def run_cvae(gpu_id, cm_file, hyper_dim=3, epochs=100):
     cm_data_input = cm_h5[u'contact_maps'] 
 
     # splitting data into train and validation
+    np.random.shuffle(cm_data_input) 
     train_val_split = int(0.8 * len(cm_data_input))
     cm_data_train, cm_data_val = cm_data_input[:train_val_split], cm_data_input[train_val_split:] 
     input_shape = cm_data_train.shape
