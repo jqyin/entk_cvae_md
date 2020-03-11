@@ -3,7 +3,7 @@ import argparse
 import numpy as np 
 from glob import glob
 import MDAnalysis as mda
-from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae  
+from utils import read_h5py_file, outliers_from_cvae, cm_to_cvae_trim  
 from utils import predict_from_cvae, outliers_from_latent
 from utils import find_frame, write_pdb_frame, make_dir_p 
 from  MDAnalysis.analysis.rms import RMSD
@@ -18,12 +18,15 @@ parser.add_argument("-m", "--md", help="Input: MD simulation directory")
 parser.add_argument("-c", "--cvae", help="Input: CVAE model directory")
 parser.add_argument("-p", "--pdb", help="Input: pdb file") 
 parser.add_argument("-r", "--ref", default=None, help="Input: Reference pdb for RMSD") 
+parser.add_argument("-l", "--aa_list", dest='l', help="Input: list of residue numbers")
 
 args = parser.parse_args()
 
 # Pdb file for MDAnalysis 
 pdb_file = os.path.abspath(args.pdb) 
 ref_pdb_file = os.path.abspath(args.ref) 
+# Read interested residue numbers
+AA_list = np.loadtxt(args.l)
 
 # Find the trajectories and contact maps 
 cm_files_list = sorted(glob(os.path.join(args.md, 'omm_runs_*/*_cm.h5')))
@@ -56,7 +59,7 @@ print "Using model {} with loss {}".format(model_best, loss_model_best)
     
 # Convert everything to cvae input 
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files_list] 
-cvae_input = cm_to_cvae(cm_data_lists)
+cvae_input = cm_to_cvae_trim(cm_data_lists, AA_list)
 
 # A record of every trajectory length
 train_data_length = [cm_data.shape[1] for cm_data in cm_data_lists]

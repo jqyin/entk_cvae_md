@@ -2,10 +2,11 @@ import h5py, warnings
 import argparse, os
 import numpy as np 
 from glob import glob
-from utils import cm_to_cvae, read_h5py_file
+from utils import cm_to_cvae_trim, read_h5py_file
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--sim_path", dest='f', help="Input: OpenMM simulation path") 
+parser.add_argument("-l", "--aa_list", dest='l', help="Input: list of residue numbers") 
 parser.add_argument("-o", help="Output: CVAE 2D contact map h5 input file")
 
 # Let's say I have a list of h5 file names 
@@ -17,6 +18,9 @@ else:
     warnings.warn("No input dirname given, using current directory...") 
     cm_filepath = os.path.abspath(os.path.join('.', 'omm*/*_cm.h5'))
 
+# Read interested residue numbers
+AA_list = np.loadtxt(args.l) 
+
 cm_files = sorted(glob(cm_filepath)) 
 if cm_files == []: 
     raise IOError("No h5 file found, recheck your input filepath") 
@@ -24,7 +28,7 @@ if cm_files == []:
 cm_data_lists = [read_h5py_file(cm_file) for cm_file in cm_files] 
 
 # Compress all .h5 files into one in cvae format 
-cvae_input = cm_to_cvae(cm_data_lists)
+cvae_input = cm_to_cvae_trim(cm_data_lists, AA_list)
 
 
 # Create .h5 as cvae input

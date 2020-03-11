@@ -47,6 +47,40 @@ def cm_to_cvae(cm_data_lists):
     return cvae_input
 
 
+def trim_cm(contact_map, resnum_intersted): 
+    for i in np.arange(contact_map.shape[0]): 
+        if i not in resnum_intersted: 
+            contact_map[i] = 10 
+            contact_map[:,i] = 10 
+    contact_map = contact_map[contact_map != 10] 
+    assert len(contact_map) == len(resnum_intersted) ** 2
+    return contact_map.reshape(len(resnum_intersted), len(resnum_intersted))
+
+
+def cm_to_cvae_trim(cm_data_lists, resnum_intersted): 
+    """
+    A function converting the 2d upper triangle information of contact maps 
+    read from hdf5 file to full contact map of interested residues and 
+    reshape to the format ready for cvae
+    """
+    cm_all = np.hstack(cm_data_lists)
+
+    # transfer upper triangle to full matrix 
+    cm_data_full = np.array([trim_cm(triu_to_full(cm_data), resnum_intersted) for cm_data in cm_all.T]) 
+
+    # padding if odd dimension occurs in image 
+    pad_f = lambda x: (0,0) if x%2 == 0 else (0,1) 
+    padding_buffer = [(0,0)] 
+    for x in cm_data_full.shape[1:]: 
+        padding_buffer.append(pad_f(x))
+    cm_data_full = np.pad(cm_data_full, padding_buffer, mode='constant')
+
+    # reshape matrix to 4d tensor 
+    cvae_input = cm_data_full.reshape(cm_data_full.shape + (1,))   
+    
+return cvae_input
+
+
 def stamp_to_time(stamp): 
     import datetime
     return datetime.datetime.fromtimestamp(stamp).strftime('%Y-%m-%d %H:%M:%S') 
