@@ -35,26 +35,21 @@ def cm_to_cvae(cm_data_lists):
     cm_data_full = np.array([triu_to_full(cm_data) for cm_data in cm_all.T]) 
 
     # padding if odd dimension occurs in image 
-    pad_f = lambda x: (0,0) if x%2 == 0 else (0,1) 
-    padding_buffer = [(0,0)] 
+    pad_f = lambda x: (0, 0) if x % 2 == 0 else (0, 1) 
+    padding_buffer = [(0, 0)] 
     for x in cm_data_full.shape[1:]: 
         padding_buffer.append(pad_f(x))
     cm_data_full = np.pad(cm_data_full, padding_buffer, mode='constant')
 
     # reshape matrix to 4d tensor 
     cvae_input = cm_data_full.reshape(cm_data_full.shape + (1,))   
-    
     return cvae_input
 
 
-def trim_cm(contact_map, resnum_intersted): 
-    for i in np.arange(contact_map.shape[0]): 
-        if i not in resnum_intersted: 
-            contact_map[i] = 10 
-            contact_map[:,i] = 10 
-    contact_map = contact_map[contact_map != 10] 
-    assert len(contact_map) == len(resnum_intersted) ** 2
-    return contact_map.reshape(len(resnum_intersted), len(resnum_intersted))
+def trim_cm(contact_map, indices): 
+    n_res = len(contact_map)
+    indice_array = [True if i in indices else False for i in range(n_res)] 
+    return contact_map[indice_array]
 
 
 def cm_to_cvae_trim(cm_data_lists, resnum_intersted): 
@@ -66,25 +61,26 @@ def cm_to_cvae_trim(cm_data_lists, resnum_intersted):
     cm_all = np.hstack(cm_data_lists)
 
     # transfer upper triangle to full matrix 
-    cm_data_full = np.array([trim_cm(triu_to_full(cm_data), resnum_intersted) for cm_data in cm_all.T]) 
+    cm_data_full = np.array(
+        [trim_cm(triu_to_full(cm_data), resnum_intersted) for cm_data in cm_all.T]) 
 
     # padding if odd dimension occurs in image 
-    pad_f = lambda x: (0,0) if x%2 == 0 else (0,1) 
-    padding_buffer = [(0,0)] 
+    pad_f = lambda x: (0, 0) if x % 2 == 0 else (0, 1) 
+    padding_buffer = [(0, 0)] 
     for x in cm_data_full.shape[1:]: 
         padding_buffer.append(pad_f(x))
     cm_data_full = np.pad(cm_data_full, padding_buffer, mode='constant')
 
     # reshape matrix to 4d tensor 
     cvae_input = cm_data_full.reshape(cm_data_full.shape + (1,))   
-    
-return cvae_input
+
+    return cvae_input
 
 
 def stamp_to_time(stamp): 
     import datetime
     return datetime.datetime.fromtimestamp(stamp).strftime('%Y-%m-%d %H:%M:%S') 
-    
+
 
 def find_frame(traj_dict, frame_number=0): 
     local_frame = frame_number
@@ -95,9 +91,9 @@ def find_frame(traj_dict, frame_number=0):
             return traj_file, local_frame
         else: 
             local_frame -= int(traj_dict[key])
-    raise Exception('frame %d should not exceed the total number of frames, %d' % (frame_number, sum(np.array(traj_dict.values()).astype(int))))
-    
-    
+    raise Exception('frame %d should not exceed the total number of frames, %d'% (frame_number, sum(np.array(traj_dict.values()).astype(int))))
+
+
 def write_pdb_frame(traj_file, pdb_file, frame_number, output_pdb): 
     mda_traj = mda.Universe(pdb_file, traj_file)
     mda_traj.trajectory[frame_number] 
