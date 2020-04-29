@@ -73,7 +73,7 @@ class conv_variational_autoencoder(object):
 
     def __init__(self,image_size,channels,conv_layers,feature_maps,filter_shapes,
                  strides,dense_layers,dense_neurons,dense_dropouts,latent_dim,
-                 activation='relu',eps_mean=0.0,eps_std=1.0):
+                 activation='relu',eps_mean=0.0,eps_std=1.0,lr=0.001):
 
         self.history = LossHistory();
         
@@ -91,17 +91,17 @@ class conv_variational_autoencoder(object):
         
         # even shaped filters may cause problems in theano backend;
         even_filters = [f for pair in filter_shapes for f in pair if f % 2 == 0];
-        if K.image_dim_ordering() == 'th' and len(even_filters) > 0:
+        if K.common.image_dim_ordering() == 'th' and len(even_filters) > 0:
             warnings.warn('Even shaped filters may cause problems in Theano backend')
-        if K.image_dim_ordering() == 'channels_first' and len(even_filters) > 0:
+        if K.common.image_dim_ordering() == 'channels_first' and len(even_filters) > 0:
             warnings.warn('Even shaped filters may cause problems in Theano backend')
         
         self.eps_mean = eps_mean;
         self.eps_std = eps_std;
         self.image_size = image_size;
-        
+        self.lr = lr; 
         # define input layer;
-        if K.image_dim_ordering() == 'th' or K.image_dim_ordering() == 'channels_first':
+        if K.common.image_dim_ordering() == 'th' or K.common.image_dim_ordering() == 'channels_first':
             self.input = Input(shape=(channels,image_size[0],image_size[1]))
         else:
             self.input = Input(shape=(image_size[0],image_size[1],channels))
@@ -146,7 +146,7 @@ class conv_variational_autoencoder(object):
         
         # dummy model to get image size after encoding convolutions;
         self.decode_conv = [];
-        if K.image_dim_ordering() == 'th' or K.image_dim_ordering() == 'channels_first':
+        if K.common.image_dim_ordering() == 'th' or K.common.image_dim_ordering() == 'channels_first':
             dummy_input = np.ones((1,channels,image_size[0],image_size[1]))
         else:
             dummy_input = np.ones((1,image_size[0],image_size[1],channels))
@@ -161,14 +161,14 @@ class conv_variational_autoencoder(object):
         
         # define deconvolutional decoding layers;
         for i in range(1,conv_layers):
-            if K.image_dim_ordering() == 'th' or K.image_dim_ordering() == 'channels_first':
+            if K.common.image_dim_ordering() == 'th' or K.common.image_dim_ordering() == 'channels_first':
                 dummy_input = np.ones((1,channels,image_size[0],image_size[1]))
             else:
                 dummy_input = np.ones((1,image_size[0],image_size[1],channels))
             dummy = Model(self.input, self.encode_conv[-i-1]);
             conv_size = list(dummy.predict(dummy_input).shape);
             
-            if K.image_dim_ordering() == 'th' or K.image_dim_ordering() == 'channels_first':
+            if K.common.image_dim_ordering() == 'th' or K.common.image_dim_ordering() == 'channels_first':
                 conv_size[1] = feature_maps[-i]
             else:
                 conv_size[3] = feature_maps[-i]
@@ -186,7 +186,7 @@ class conv_variational_autoencoder(object):
 
         # build model;
         self.model = Model(self.input, self.output);
-        self.optimizer = RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0);
+        self.optimizer = RMSprop(lr=self.lr, rho=0.9, epsilon=1e-08, decay=0.0);
         self.model.compile(optimizer=self.optimizer, loss=self._vae_loss);
 #         print "model summary:"
 #         self.model.summary()
@@ -223,7 +223,7 @@ class conv_variational_autoencoder(object):
         return xent_loss + kl_loss;
         
     def train(self,data,batch_size,epochs=1,validation_data=None,
-              checkpoint=False,filepath=None):
+              callbacks=None, initial_epoch=0, checkpoint=False,filepath=None):
         '''
         train network on given data;
         
@@ -247,8 +247,11 @@ class conv_variational_autoencoder(object):
         if checkpoint==True and filepath==None:
             raise Exception("Please enter a path to save the network") 
 
+        if callbacks == None:
+            callbacks = [self.history]
         self.model.fit(data,data,batch_size,epochs=epochs,shuffle=True,
-                       validation_data=(data,data),callbacks=[self.history]);
+                       validation_data=(data,data),
+                       initial_epoch=initial_epoch,callbacks=callbacks);
     
     def save(self,filepath):
         '''
