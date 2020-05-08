@@ -81,7 +81,7 @@ def run_cvae(cm_file, batch_size=32, hyper_dim=3, epochs=100):
 
     model_weight = 'cvae_weight-{epoch}.h5'
     model_file = 'cvae_model-{epoch}.h5'
-    loss_file = 'loss.npy'
+    loss_file = 'loss.npz'
 
     resume_from_epoch = 0
     for try_epoch in range(epochs, 0, -1):
@@ -106,10 +106,11 @@ def run_cvae(cm_file, batch_size=32, hyper_dim=3, epochs=100):
     if hvd.rank() == 0:   
         cvae.model.save_weights(model_weight.format(epoch=epochs))
         cvae.save(model_file.format(epoch=epochs))
-        losses = []
+        losses = {'loss':[], 'val_loss':[]}
         if resume_from_epoch > 0:
             losses = np.load(loss_file)
-        losses = np.concatenate([losses, cvae.history.losses])    
-        np.save(loss_file, losses)
+        train_losses = np.concatenate([losses['loss'], cvae.history.losses])    
+        val_losses = np.concatenate([losses['val_loss'], cvae.history.val_losses])    
+        np.savez(loss_file, loss=train_losses, val_loss=val_losses)
  
     return cvae 
