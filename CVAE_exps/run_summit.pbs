@@ -1,12 +1,22 @@
 #!/bin/bash
-# Summitdev OpenMM testing
-#BSUB -P MED106 
-#BSUB -J test_omm_ppc
+# Begin LSF directives
+#BSUB -P stf011
+#BSUB -J test
 #BSUB -o tst.o%J
-#BSUB -W 1:00
-#BSUB -nnodes 1
+#BSUB -W 2:00
+#BSUB -nnodes 2
 # End LSF directives and begin shell commands
-date
-source activate hm0 
-module load cuda/9.1.85
-jsrun -n 1 -a 1 -g 1 python train_cvae.py  -f cvae_input.h5  
+
+source env-summit.sh
+NODES=$(cat ${LSB_DJOB_HOSTFILE} | sort | uniq | grep -v login | grep -v batch | wc -l)
+
+epochs=20
+batch=16
+dims=3
+
+jsrun -n${NODES} -a 6 -g 6 -c42 -r1  python train_cvae.py \
+                                            -d $dims \
+                                            --train_file cvae_input_train.h5 \
+                                            --val_file cvae_input_val.h5 \
+                                            -batch_size $batch  \
+                                            -epochs $epochs

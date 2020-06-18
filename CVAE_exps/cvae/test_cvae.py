@@ -21,16 +21,19 @@ model_weight=args.w
 hyper_dim=args.d
 output_file=args.o
 
+npred = 1000
+
 cm_data = h5py.File(input_file,'r')['contact_maps'].value
 
 cvae = CVAE(cm_data.shape[1:], hyper_dim)
 cvae.model.load_weights(model_weight)
 
-cm_pred = cvae.decode(cm_data)
-cm_emb = cvae.return_embeddings(cm_data)
-np.savez(output_file, pred=cm_pred, emb=cm_emb)
+cm_pred = np.array([cvae.decode(np.expand_dims(sample,axis=0)) for sample in cm_data[:npred]])
+cm_emb = np.array([cvae.return_embeddings(np.expand_dims(sample,axis=0)) for sample in cm_data])
 
+np.savez(output_file, pred=cm_pred, emb=cm_emb)
 cm_pred = cm_pred.astype(cm_data.dtype)
 
-acc = accuracy_score(cm_data.flatten(),cm_pred.flatten())
+acc = accuracy_score(cm_data[:npred].flatten(),cm_pred[:npred].flatten())
 print("Accuracy: ", acc)
+

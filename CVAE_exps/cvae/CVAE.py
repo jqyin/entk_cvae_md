@@ -5,7 +5,10 @@ import keras
 from keras import backend as K
 import math
 import numpy as np
+from data_gen import CVAEGenerator
 # from keras.optimizers import RMSprop
+#from tensorflow_large_model_support import LMS
+#lms_callback = LMS()
 
 tf.compat.v1.disable_eager_execution()
 
@@ -40,12 +43,12 @@ def CVAE(input_shape, latent_dim=3, lr=0.001):
     image_size = input_shape[:-1]
     channels = input_shape[-1]
     conv_layers = 4
-    feature_maps = [64,64,64,64]
+    feature_maps = [32,64,64,32]
     filter_shapes = [(3,3),(3,3),(3,3),(3,3)]
     strides = [(1,1),(2,2),(1,1),(1,1)]
     dense_layers = 1
     dense_neurons = [128]
-    dense_dropouts = [0]
+    dense_dropouts = [0.5]
 
     feature_maps = feature_maps[0:conv_layers];
     filter_shapes = filter_shapes[0:conv_layers];
@@ -55,24 +58,20 @@ def CVAE(input_shape, latent_dim=3, lr=0.001):
     autoencoder.model.summary()
     return autoencoder
 
-def run_cvae(cm_file, batch_size=32, hyper_dim=3, epochs=100): 
+def run_cvae(cm_file_train, cm_file_val,
+             batch_size=32, hyper_dim=3, epochs=100): 
     hvd.init()
-    # read contact map from h5 file 
-    cm_h5 = h5py.File(cm_file, 'r', libver='latest', swmr=True)
-    cm_data_input = cm_h5[u'contact_maps'] 
 
-    # splitting data into train and validation
-    train_val_split = int(0.8 * len(cm_data_input))
-    cm_data_train, cm_data_val = cm_data_input[:train_val_split], cm_data_input[train_val_split:] 
-    input_shape = cm_data_train.shape
-    cm_h5.close()
+    gen_train = CVAEGenerator(cm_file_train, hvd_size=hvd.size(), batch_size=batch_size, shuffle=True)
+    gen_val = CVAEGenerator(cm_file_val, hvd_size=hvd.size(), batch_size=batch_size, shuffle=True)
+    input_shape = gen_train.get_shape()
     
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
     config.gpu_options.visible_device_list = str(hvd.local_rank())
     K.set_session(tf.Session(config=config))
 
-    epochs = int(math.ceil(epochs / hvd.size()))
+    #epochs = int(math.ceil(epochs / hvd.size()))
 
     #cvae = CVAE(input_shape[1:], hyper_dim, lr=0.001*hvd.size()) 
     cvae = CVAE(input_shape[1:], hyper_dim, lr=0.001) 
@@ -94,13 +93,14 @@ def run_cvae(cm_file, batch_size=32, hyper_dim=3, epochs=100):
         cvae.model.load_weights(model_weight.format(epoch=resume_from_epoch))
     
     callbacks = [hvd.callbacks.BroadcastGlobalVariablesCallback(0),]
+    #callbacks.append(lms_callback)
     if hvd.rank() == 0: 
         callbacks.append(cvae.history)
         #callbacks.append(keras.callbacks.TensorBoard('./logs'))
         #callbacks.append(keras.callbacks.ModelCheckpoint('./checkpoint-{epoch}.h5'))    
 
 #     callback = EmbeddingCallback(cm_data_train, cvae)
-    cvae.train(cm_data_train, validation_data=cm_data_val, 
+    cvae.train(gen_train, validation_data=gen_val, 
                batch_size=batch_size, epochs=epochs, 
                initial_epoch=resume_from_epoch, callbacks=callbacks) 
     if hvd.rank() == 0:   

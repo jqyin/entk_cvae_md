@@ -251,8 +251,12 @@ class conv_variational_autoencoder(object):
      
         if callbacks == None:
             callbacks = [self.history]
-        self.model.fit(data,data,batch_size,epochs=epochs,shuffle=True,
-                       validation_data=(validation_data,validation_data),
+        #self.model.fit(data,data,batch_size,epochs=epochs,shuffle=True,
+        #               validation_data=(validation_data,validation_data),
+        #               initial_epoch=initial_epoch,callbacks=callbacks);
+        self.model.fit_generator(generator=data,
+                       validation_data=validation_data, 
+                       use_multiprocessing=True, workers=4, epochs=epochs,
                        initial_epoch=initial_epoch,callbacks=callbacks);
     
     def save(self,filepath):
